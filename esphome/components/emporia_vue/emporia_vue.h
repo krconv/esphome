@@ -9,19 +9,19 @@
 namespace esphome {
 namespace emporia_vue {
 
-struct __attribute__((__packed__)) PowerDataEntry {
-  int32_t phase_one;
-  int32_t phase_two;
-  int32_t phase_three;
+struct __attribute__((__packed__)) ReadingPowerEntry {
+  int32_t phase_black;  // TODO: Verify order
+  int32_t phase_red;
+  int32_t phase_blue;
 };
 
-struct __attribute__((__packed__)) EmporiaSensorData {
-  uint8_t unknown_0;  // signals whether the reading is new or not
-  uint8_t unknown_1;  // maybe a checksum, seems random
-  uint8_t unknown_2;  // unknown
-  uint8_t unknown_3;  // some kind of counter
+struct __attribute__((__packed__)) SensorReading {
+  bool is_unread;
+  uint8_t checksum;  // TODO: verify
+  uint8_t unknown;
+  uint8_t sequence_num;
 
-  PowerDataEntry power[19];
+  ReadingPowerEntry power[19];
 
   uint16_t voltage[3];
   uint16_t frequency;
@@ -32,33 +32,7 @@ struct __attribute__((__packed__)) EmporiaSensorData {
   uint16_t end;
 };
 
-class PhaseConfig;
-class PowerSensor;
-
-class EmporiaVueComponent : public PollingComponent, public i2c::I2CDevice {
- public:
-  void dump_config() override;
-
-  void set_phases(std::vector<PhaseConfig *> phases);
-  void set_power_sensors(std::vector<PowerSensor *> sensors);
-
-  void update() override;
-
- private:
-  std::vector<PhaseConfig *> phases_;
-  std::vector<PowerSensor *> power_sensors_;
-};
-
-enum PhaseInputColor { BLACK, RED, BLUE };
-
-class PhaseConfig {
- public:
-  void set_input_color(PhaseInputColor input_color);
-  int32_t extract_power_for_phase(const PowerDataEntry &entry);
-
- private:
-  PhaseInputColor input_color_;
-};
+enum PhaseInputWire : uint8_t { BLACK, RED, BLUE };
 
 enum CTInputPort : uint8_t {
   A = 0,
@@ -82,16 +56,64 @@ enum CTInputPort : uint8_t {
   SIXTEEN = 18,
 };
 
+class PhaseConfig;
+class PowerSensor;
+
+class EmporiaVueComponent : public PollingComponent, public i2c::I2CDevice {
+ public:
+  void dump_config() override;
+
+  void set_sensor_poll_interval(uint32_t sensor_poll_interval);
+  void set_phases(std::vector<PhaseConfig *> phases);
+  void set_power_sensors(std::vector<PowerSensor *> sensors);
+
+  void loop() override;
+  void update() override;
+
+ private:
+  uint32_t sensor_poll_interval_;
+  uint32_t last_poll_ = 0;
+  uint8_t last_sequence_num_ = 0;
+  std::vector<PhaseConfig *> phases_;
+  std::vector<PowerSensor *> power_sensors_;
+};
+
+class PhaseConfig {
+ public:
+  void set_input_wire(PhaseInputWire input_wire);
+  PhaseInputWire get_input_wire() const;
+
+  void set_calibration(float calibration);
+  float get_calibration() const;
+
+  int32_t extract_reading_for_phase(const ReadingPowerEntry &power_entry) const;
+
+ private:
+  PhaseInputWire input_wire_;
+  float calibration_;
+};
 class PowerSensor : public sensor::Sensor {
  public:
   void set_phase(PhaseConfig *phase);
-  void set_ct_input(CTInputPort ct_input);
+  const PhaseConfig *get_phase() const;
 
-  void update_from_data(const EmporiaSensorData &data);
+  void set_input_port(CTInputPort input_port);
+  CTInputPort get_input_port() const;
+
+  void record(const SensorReading &sensor_reading);
+
+  void publish();
 
  private:
+  friend class EmporiaVueComponent;
+
+  float calibrate_value(float raw_value) const;
+
+  int64_t total_since_publish_ = 0;
+  uint32_t readings_since_publish_ = 0;
+
   PhaseConfig *phase_;
-  CTInputPort ct_input_;
+  CTInputPort input_port_;
 };
 
 }  // namespace emporia_vue
