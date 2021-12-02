@@ -2,12 +2,21 @@ from esphome.components import sensor, i2c
 import esphome.config_validation as cv
 import esphome.codegen as cg
 from esphome.const import (
+    CONF_CALIBRATION,
+#    CONF_CT,
     CONF_ID,
     CONF_INPUT,
+#    CONF_PHASES,
+#    CONF_PHASE_ID,
     DEVICE_CLASS_ENERGY,
     STATE_CLASS_MEASUREMENT,
     UNIT_WATT,
 )
+
+# TODO: Remove this - It's only added so we can test the component using the External_component configuration
+CONF_CT = "ct"
+CONF_PHASES = "phases"
+CONF_PHASE_ID = "phase_id"
 
 CODEOWNERS = ["@flaviut", "@Maelstrom96", "@krconv"]
 ESP_PLATFORMS = ["esp-idf"]
@@ -16,10 +25,10 @@ AUTOLOAD = ["sensor"]
 
 emporia_vue_ns = cg.esphome_ns.namespace("emporia_vue")
 EmporiaVueComponent = emporia_vue_ns.class_(
-    "EmporiaVueComponent", cg.PollingComponent, i2c.I2CDevice
+    "EmporiaVueComponent", cg.Component, i2c.I2CDevice
 )
 PhaseConfig = emporia_vue_ns.class_("PhaseConfig")
-PowerSensor = emporia_vue_ns.class_("PowerSensor", sensor.Sensor)
+CTSensor = emporia_vue_ns.class_("CTSensor", sensor.Sensor)
 
 PhaseInputColor = emporia_vue_ns.enum("PhaseInputColor")
 PHASE_INPUT = {
@@ -51,9 +60,18 @@ CT_INPUT = {
     "16": CTInputPort.SIXTEEN,
 }
 
-CONF_PHASES = "phases"
-CONF_PHASE_ID = "phase_id"
-CONF_POWER = "power"
+SCHEMA_CT = sensor.sensor_schema(
+    unit_of_measurement=UNIT_WATT,
+    device_class=DEVICE_CLASS_ENERGY,
+    state_class=STATE_CLASS_MEASUREMENT,
+).extend(
+    {
+        cv.GenerateID(): cv.declare_id(CTSensor),
+        cv.Required(CONF_PHASE_ID): cv.use_id(PhaseConfig),
+        cv.Required(CONF_INPUT): cv.enum(CT_INPUT),
+        cv.Optional(CONF_CALIBRATION, default=0.022): cv.zero_to_one_float,
+    }
+)
 
 CONFIG_SCHEMA = (
     cv.Schema(
@@ -65,23 +83,11 @@ CONFIG_SCHEMA = (
                     cv.Required(CONF_INPUT): cv.enum(PHASE_INPUT),
                 }
             ),
-            cv.Required(CONF_POWER): cv.ensure_list(
-                sensor.sensor_schema(
-                    unit_of_measurement=UNIT_WATT,
-                    device_class=DEVICE_CLASS_ENERGY,
-                    state_class=STATE_CLASS_MEASUREMENT,
-                ).extend(
-                    {
-                        cv.GenerateID(): cv.declare_id(PowerSensor),
-                        cv.Required(CONF_PHASE_ID): cv.use_id(PhaseConfig),
-                        cv.Required(CONF_INPUT): cv.enum(CT_INPUT),
-                    }
-                )
-            ),
+            cv.Required(CONF_CT): cv.ensure_list(SCHEMA_CT),
         },
         # cv.only_with_esp_idf,
     )
-    .extend(cv.polling_component_schema("5s"))
+    .extend(cv.COMPONENT_SCHEMA)
     .extend(i2c.i2c_device_schema(0x64))
 )
 
@@ -99,14 +105,14 @@ async def to_code(config):
         phases.append(phase_var)
     cg.add(var.set_phases(phases))
 
-    power_sensors = []
-    for power_config in config[CONF_POWER]:
-        power_var = cg.new_Pvariable(power_config[CONF_ID], PowerSensor())
-        phase_var = await cg.get_variable(power_config[CONF_PHASE_ID])
+    ct_sensors = []
+    for ct_config in config[CONF_CT]:
+        power_var = cg.new_Pvariable(ct_config[CONF_ID], CTSensor())
+        phase_var = await cg.get_variable(ct_config[CONF_PHASE_ID])
         cg.add(power_var.set_phase(phase_var))
-        cg.add(power_var.set_ct_input(power_config[CONF_INPUT]))
+        cg.add(power_var.set_ct_input(ct_config[CONF_INPUT]))
 
-        await sensor.register_sensor(power_var, power_config)
+        await sensor.register_sensor(power_var, ct_config)
 
-        power_sensors.append(power_var)
-    cg.add(var.set_power_sensors(power_sensors))
+        ct_sensors.append(power_var)
+    cg.add(var.set_ct_sensors(ct_sensors))
