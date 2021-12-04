@@ -5,8 +5,6 @@
 #include "esphome/core/component.h"
 #include "esphome/components/i2c/i2c.h"
 #include "esphome/components/sensor/sensor.h"
-#include <freertos/FreeRTOS.h>
-#include <freertos/queue.h>
 
 namespace esphome {
 namespace emporia_vue {
@@ -46,16 +44,14 @@ class EmporiaVueComponent : public Component, public i2c::I2CDevice {
   void set_phases(std::vector<PhaseConfig *> phases) { this->phases_ = phases; }
   void set_ct_clamps(std::vector<CTClampConfig *> ct_clamps) { this->ct_clamps_ = ct_clamps; }
 
-  void setup() override;
   void loop() override;
 
  private:
-  static void i2c_request_task(void *pv);
-
   uint32_t sensor_poll_interval_;
+  uint32_t last_poll_ = 0;
+  uint8_t last_sequence_num_ = 0;
   std::vector<PhaseConfig *> phases_;
   std::vector<CTClampConfig *> ct_clamps_;
-  QueueHandle_t i2c_data_queue_;
 };
 
 enum PhaseInputWire : uint8_t {
