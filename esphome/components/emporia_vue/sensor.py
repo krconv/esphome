@@ -4,12 +4,9 @@ import esphome.codegen as cg
 from esphome.const import (
     CONF_CALIBRATION,
     CONF_CURRENT,
-    #    CONF_CT,
     CONF_ID,
     CONF_INPUT,
     CONF_POWER,
-    #    CONF_PHASES,
-    #    CONF_PHASE_ID,
     CONF_VOLTAGE,
     DEVICE_CLASS_CURRENT,
     DEVICE_CLASS_POWER,
@@ -20,7 +17,6 @@ from esphome.const import (
     UNIT_VOLT,
 )
 
-# TODO: Remove this - It's only added so we can test the component using the External_component configuration
 CONF_CT_CLAMPS = "ct_clamps"
 CONF_PHASES = "phases"
 CONF_PHASE_ID = "phase_id"
