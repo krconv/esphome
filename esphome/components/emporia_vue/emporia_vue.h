@@ -51,7 +51,7 @@ class EmporiaVueComponent : public Component, public i2c::I2CDevice {
   void set_sensor_poll_interval(uint32_t sensor_poll_interval) { this->sensor_poll_interval_ = sensor_poll_interval; }
   uint32_t get_sensor_poll_interval() const { return this->sensor_poll_interval_; }
   void set_phases(std::vector<PhaseConfig *> phases) { this->phases_ = std::move(phases); }
-  void set_ct_clamps(std::vector<CTClampConfig *> ct_clamps) { this->ct_clamps_ = ct_clamps; }
+  void set_ct_clamps(std::vector<CTClampConfig *> ct_clamps) { this->ct_clamps_ = std::move(ct_clamps); }
 #ifdef USING_OTA_COMPONENT
   void set_ota(ota::OTAComponent *ota) { this->ota_ = ota; }
 #endif
